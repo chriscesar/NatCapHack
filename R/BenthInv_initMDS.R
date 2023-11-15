@@ -134,4 +134,131 @@ geom_segment(data=scores_site,aes(x=NMDS1,y=NMDS2,
                inherit.aes = FALSE,show.legend = FALSE,hjust=0.5)+
   coord_equal()+
   theme(legend.title = element_blank(),
-        axis.title = element_text(face="bold"))
+        axis.title = element_text(face="bold")) -> pl
+ggsave(filename = "figs/MDS_by_tax_abund.pdf",width = 12,height = 12,
+       units = "in",
+       plot=pl)
+rm(pl)
+
+# weight trait data by abundance ####
+
+#steps#
+# remove taxon names
+# convert to long
+# multiply abundance by trait values
+# group by samples and sum traits
+
+dfTrt <- df0 %>% 
+  filter(!str_detect(TAXON_GROUP_NAME, "^insect")) %>% #remove insects
+  dplyr::select(c(AGENCY_AREA:SIEVE_SIZE,
+                  NUMBER_FOUND, sr_Less_than_10:b_None)) %>% 
+  filter(!is.na(NUMBER_FOUND)) %>%
+  filter(., WATER_BODY %in% wbs) %>%
+  pivot_longer(cols = sr_Less_than_10:b_None,
+                names_to = "trait", values_to = "score") %>% 
+  filter(!is.na(score)) %>% 
+  mutate(wt_trt = NUMBER_FOUND*score) %>% 
+  select(-NUMBER_FOUND, -score) %>% 
+  group_by(
+   AGENCY_AREA, REPORTING_AREA,             
+   SEA_AREA, WATERBODY_TYPE_DESCRIPTION, 
+   WATER_BODY, SITE_ID,                    
+   SITE_VERSION, SITE_NGR_PREFIX,            
+   SITE_EASTING, SITE_NORTHING,              
+   SITE_NGR_10_FIG, SITE_FULL_EASTING,          
+   SITE_FULL_NORTHING, WIMS_SITE_ID,               
+   WFD_WATERBODY_ID, SAMPLE_ID,                  
+   SAMPLE_VERSION, REPLICATE_CODE,             
+   SURVEY_CODE, SAMPLE_NGR_PREFIX,          
+   SAMPLE_EASTING, SAMPLE_NORTHING,            
+   SAMPLE_NGR_10_FIG, SAMPLE_FULL_EASTING,        
+   SAMPLE_FULL_NORTHING, SAMPLE_DATE,                
+   SAMPLE_TYPE_DESCRIPTION, SAMPLE_METHOD_DESCRIPTION,  
+   SAMPLE_REASON, BENT_GRAB_DEPTH,            
+   BENT_PSA, BENT_DEPTH_RPD_LAYER,       
+   ANALYSIS_ID, DATE_OF_ANALYSIS,           
+   ANALYSIS_TYPE_DESCRIPTION, ANALYSIS_METHOD_DESCRIPTION,
+   SIEVE_SIZE, trait
+   ) %>% 
+  summarise(wt_trt=sum(wt_trt), .groups = "drop") %>% 
+  pivot_wider(names_from = trait,
+              values_from = wt_trt,
+              values_fill = 0)
+
+## remove traitless rows
+sms <- rowSums(dfTrt[,-c(1:37)])!=0
+dfTrt <- dfTrt[sms,]
+
+## initial MDS
+# chop off metadata
+dfTrt_ord <- dfTrt[,-c(1:37)]
+
+ptm <- Sys.time()###
+set.seed(pi);ordTrt <- vegan::metaMDS(dfTrt_ord,
+                                   autotransform = TRUE,
+                                   trymax = 100)
+saveRDS(ordTrt, file = "data/out/ordTrt.Rdata")
+Sys.time() - ptm;rm(ptm)
+plot(ordTrt)
+
+#### extract ordination axes ####
+scores_site <- dfTrt %>% 
+  dplyr::select(c(1:37))
+tmp_sites <- as_tibble(as.data.frame(scores(ordTrt,display = "site")))  #Using the scores function from vegan to extract the site scores and convert to a data.frame
+scores_site$NMDS1 <- tmp_sites$NMDS1 #location of individual samples in NMDS space
+scores_site$NMDS2 <- tmp_sites$NMDS2 #location of individual samples in NMDS space
+
+# Using the scores function from vegan to extract the species scores and
+# convert to a data.frame
+scores_species <- as.data.frame(scores(ordTrt,display = "species"))
+scores_species$lbfull <-  row.names(scores_species)
+scores_species$lb <-  make.cepnames(row.names(scores_species))#shorten names
+
+#### generate mean centroids by WB ####
+scores_site %>% 
+  group_by(WATER_BODY) %>%
+  summarise(mn_ax1_WB=mean(NMDS1),mn_ax2_WB=mean(NMDS2)) %>%
+  ungroup() -> centr
+
+scores_site <- left_join(scores_site,centr,by="WATER_BODY");rm(centr)
+
+scores_site$WBlbl <- ifelse(scores_site$WATER_BODY=="CARRICK ROADS",
+                            "Carrick Rd",
+                            ifelse(scores_site$WATER_BODY=="TAMAR",
+                                   "Tamar",
+                                   ifelse(scores_site$WATER_BODY=="SOUTHAMPTON WATER",
+                                          "Soton W",
+                                          ifelse(scores_site$WATER_BODY=="POOLE HARBOUR",
+                                                 "Poole",NA))))
+
+ggplot()+
+  geom_hline(colour="grey",yintercept = 0, lty=2)+
+  geom_vline(colour="grey",xintercept = 0, lty=2)+
+  geom_text(data=scores_species, aes(x = NMDS1, y=NMDS2, label=lb),
+            size=3,
+            alpha=0.2)+
+  geom_segment(data=scores_site,aes(x=NMDS1,y=NMDS2,
+                                    colour=WATER_BODY,
+                                    xend=mn_ax1_WB,yend=mn_ax2_WB),
+               show.legend = FALSE)+
+  geom_point(data=scores_site, show.legend=TRUE,
+             aes(x=NMDS1, y=NMDS2,
+                 fill = WATER_BODY,
+                 shape = WATER_BODY),
+             size=3)+
+  scale_fill_manual(values=c(cbPalette))+
+  scale_colour_manual(values=c(cbPalette))+
+  scale_shape_manual(values = rep(c(24,25,23),each=2))+
+  geom_textbox(size=3,data=scores_site,aes(x=mn_ax1_WB,
+                                           y=mn_ax2_WB,
+                                           label=WBlbl,
+                                           fill=WATER_BODY),
+               width = unit(0.15, "npc"),
+               inherit.aes = FALSE,show.legend = FALSE,hjust=0.5)+
+  coord_equal()+
+  theme(legend.title = element_blank(),
+        axis.title = element_text(face="bold")) -> pl
+ggsave(filename = "figs/MDS_by_traits.pdf",width = 12,height = 12,
+       units = "in",
+       plot=pl)
+rm(pl)
