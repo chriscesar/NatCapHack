@@ -2,6 +2,7 @@
 #load packages
 require(tidyverse)
 require(vegan)
+require(ggtext)
 
 ggplot2::theme_set(ggthemes::theme_few())
 
@@ -98,6 +99,15 @@ scores_site %>%
 
 scores_site <- left_join(scores_site,centr,by="WATER_BODY");rm(centr)
 
+scores_site$WBlbl <- ifelse(scores_site$WATER_BODY=="CARRICK ROADS",
+                            "Carrick Rd",
+                            ifelse(scores_site$WATER_BODY=="TAMAR",
+                                   "Tamar",
+                                   ifelse(scores_site$WATER_BODY=="SOUTHAMPTON WATER",
+                                          "Soton W",
+                                          ifelse(scores_site$WATER_BODY=="POOLE HARBOUR",
+                                                 "Poole",NA))))
+
 ggplot()+
   geom_hline(colour="grey",yintercept = 0, lty=2)+
   geom_vline(colour="grey",xintercept = 0, lty=2)+
@@ -116,6 +126,12 @@ geom_segment(data=scores_site,aes(x=NMDS1,y=NMDS2,
   scale_fill_manual(values=c(cbPalette))+
   scale_colour_manual(values=c(cbPalette))+
   scale_shape_manual(values = rep(c(24,25,23),each=2))+
+  geom_textbox(size=3,data=scores_site,aes(x=mn_ax1_WB,
+                                           y=mn_ax2_WB,
+                                           label=WBlbl,
+                                           fill=WATER_BODY),
+               width = unit(0.15, "npc"),
+               inherit.aes = FALSE,show.legend = FALSE,hjust=0.5)+
   coord_equal()+
   theme(legend.title = element_blank(),
         axis.title = element_text(face="bold"))
