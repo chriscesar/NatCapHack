@@ -137,7 +137,7 @@ geom_segment(data=scores_siteAbund,aes(x=NMDS1,y=NMDS2,
                width = unit(0.15, "npc"),
                inherit.aes = FALSE,show.legend = FALSE,hjust=0.5)+
   coord_equal()+
-  labs(title = "NMDS: Abundance")+
+  labs(title = "NMDS: Taxon data")+
   theme(legend.title = element_blank(),
         legend.position="none",
         axis.title = element_text(face="bold")) -> plabund
@@ -262,7 +262,7 @@ ggplot()+
                width = unit(0.15, "npc"),
                inherit.aes = FALSE,show.legend = FALSE,hjust=0.5)+
   coord_equal()+
-  labs(title = "NMDS: Traits")+
+  labs(title = "NMDS: Trait data")+
   theme(legend.title = element_blank(),
         legend.position="none",
         axis.title = element_text(face="bold")) -> pltrt
