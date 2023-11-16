@@ -71,12 +71,13 @@ dfw <- dfw[kp,]
 # chop off metadata
 dfw_ord <- dfw[,-c(1:37)]
 
-ptm <- Sys.time()###
-set.seed(pi);ordAbund <- vegan::metaMDS(dfw_ord,
-                                   autotransform = TRUE,
-                                   trymax = 20)
-saveRDS(ordAbund, file = "data/out/ordAbund.Rdata")
-Sys.time() - ptm;rm(ptm)
+# ptm <- Sys.time()###
+# set.seed(pi);ordAbund <- vegan::metaMDS(dfw_ord,
+#                                    autotransform = TRUE,
+#                                    trymax = 20)
+# saveRDS(ordAbund, file = "data/out/ordAbund.Rdata")
+# Sys.time() - ptm;rm(ptm)
+ordAbund <- readRDS("data/out/ordAbund.Rdata")
 plot(ordAbund)
 
 #### extract ordination axes ####
@@ -197,12 +198,13 @@ dfTrt <- dfTrt[sms,]
 # chop off metadata
 dfTrt_ord <- dfTrt[,-c(1:37)]
 
-ptm <- Sys.time()###
-set.seed(pi);ordTrt <- vegan::metaMDS(dfTrt_ord,
-                                   autotransform = TRUE,
-                                   trymax = 20)
-saveRDS(ordTrt, file = "data/out/ordTrt.Rdata")
-Sys.time() - ptm;rm(ptm)
+# ptm <- Sys.time()###
+# set.seed(pi);ordTrt <- vegan::metaMDS(dfTrt_ord,
+#                                    autotransform = TRUE,
+#                                    trymax = 20)
+# saveRDS(ordTrt, file = "data/out/ordTrt.Rdata")
+# Sys.time() - ptm;rm(ptm)
+ordTrt <- readRDS("data/out/ordTrt.Rdata")
 plot(ordTrt)
 
 #### extract ordination axes ####
