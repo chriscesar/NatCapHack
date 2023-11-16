@@ -3,11 +3,12 @@
 require(tidyverse)
 require(vegan)
 require(ggtext)
+require(patchwork)
 
 ggplot2::theme_set(ggthemes::theme_few())
 
 # load data
-
+ppi <- 300
 df0 <- readxl::read_xlsx("data/BENTH_OPEN_DATA_TAXA_2023-11-15.xlsx",sheet = "out")
 cbPalette <- c("#999999", #153/153/153
                "#E69F00",#230/159/000
@@ -71,54 +72,56 @@ dfw <- dfw[kp,]
 dfw_ord <- dfw[,-c(1:37)]
 
 ptm <- Sys.time()###
-set.seed(pi);ord <- vegan::metaMDS(dfw_ord,
+set.seed(pi);ordAbund <- vegan::metaMDS(dfw_ord,
                                    autotransform = TRUE,
-                                   trymax = 100)
-saveRDS(ord, file = "data/out/ord3d.Rdata")
+                                   trymax = 20)
+saveRDS(ordAbund, file = "data/out/ordAbund.Rdata")
 Sys.time() - ptm;rm(ptm)
-plot(ord)
+plot(ordAbund)
 
 #### extract ordination axes ####
-scores_site <- dfw %>% 
+scores_siteAbund <- dfw %>% 
   dplyr::select(c(1:37))
-tmp_sites <- as_tibble(as.data.frame(scores(ord,display = "site")))  #Using the scores function from vegan to extract the site scores and convert to a data.frame
-scores_site$NMDS1 <- tmp_sites$NMDS1 #location of individual samples in NMDS space
-scores_site$NMDS2 <- tmp_sites$NMDS2 #location of individual samples in NMDS space
+tmp_sites <- as_tibble(as.data.frame(scores(ordAbund,display = "site")))  #Using the scores function from vegan to extract the site scores and convert to a data.frame
+scores_siteAbund$NMDS1 <- tmp_sites$NMDS1 #location of individual samples in NMDS space
+scores_siteAbund$NMDS2 <- tmp_sites$NMDS2 #location of individual samples in NMDS space
 
 # Using the scores function from vegan to extract the species scores and
 # convert to a data.frame
-scores_species <- as.data.frame(scores(ord,display = "species"))
-scores_species$lbfull <-  row.names(scores_species)
-scores_species$lb <-  make.cepnames(row.names(scores_species))#shorten names
+scores_speciesAbund <- as.data.frame(scores(ordAbund,display = "species"))
+scores_speciesAbund$lbfull <-  row.names(scores_speciesAbund)
+scores_speciesAbund$lb <-  make.cepnames(row.names(scores_speciesAbund))#shorten names
 
 #### generate mean centroids by WB ####
-scores_site %>% 
+scores_siteAbund %>% 
   group_by(WATER_BODY) %>%
   summarise(mn_ax1_WB=mean(NMDS1),mn_ax2_WB=mean(NMDS2)) %>%
-  ungroup() -> centr
+  ungroup() -> centrAbund
 
-scores_site <- left_join(scores_site,centr,by="WATER_BODY");rm(centr)
+scores_siteAbund <- left_join(scores_siteAbund,centrAbund,
+                              by="WATER_BODY");rm(centrAbund)
 
-scores_site$WBlbl <- ifelse(scores_site$WATER_BODY=="CARRICK ROADS",
+scores_siteAbund$WBlbl <- ifelse(scores_siteAbund$WATER_BODY=="CARRICK ROADS",
                             "Carrick Rd",
-                            ifelse(scores_site$WATER_BODY=="TAMAR",
+                            ifelse(scores_siteAbund$WATER_BODY=="TAMAR",
                                    "Tamar",
-                                   ifelse(scores_site$WATER_BODY=="SOUTHAMPTON WATER",
+                                   ifelse(scores_siteAbund$WATER_BODY=="SOUTHAMPTON WATER",
                                           "Soton W",
-                                          ifelse(scores_site$WATER_BODY=="POOLE HARBOUR",
+                                          ifelse(scores_siteAbund$WATER_BODY=="POOLE HARBOUR",
                                                  "Poole",NA))))
 
 ggplot()+
   geom_hline(colour="grey",yintercept = 0, lty=2)+
   geom_vline(colour="grey",xintercept = 0, lty=2)+
-  geom_text(data=scores_species, aes(x = NMDS1, y=NMDS2, label=lb),
+  geom_text(data=scores_speciesAbund,
+            aes(x = NMDS1, y=NMDS2, label=lb),
             size=3,
             alpha=0.2)+
-geom_segment(data=scores_site,aes(x=NMDS1,y=NMDS2,
+geom_segment(data=scores_siteAbund,aes(x=NMDS1,y=NMDS2,
                                   colour=WATER_BODY,
                                   xend=mn_ax1_WB,yend=mn_ax2_WB),
              show.legend = FALSE)+
-  geom_point(data=scores_site, show.legend=TRUE,
+  geom_point(data=scores_siteAbund, show.legend=TRUE,
              aes(x=NMDS1, y=NMDS2,
                  fill = WATER_BODY,
                  shape = WATER_BODY),
@@ -126,19 +129,20 @@ geom_segment(data=scores_site,aes(x=NMDS1,y=NMDS2,
   scale_fill_manual(values=c(cbPalette))+
   scale_colour_manual(values=c(cbPalette))+
   scale_shape_manual(values = rep(c(24,25,23),each=2))+
-  geom_textbox(size=3,data=scores_site,aes(x=mn_ax1_WB,
+  geom_textbox(size=3,data=scores_siteAbund,aes(x=mn_ax1_WB,
                                            y=mn_ax2_WB,
                                            label=WBlbl,
                                            fill=WATER_BODY),
                width = unit(0.15, "npc"),
                inherit.aes = FALSE,show.legend = FALSE,hjust=0.5)+
   coord_equal()+
+  labs(title = "NMDS: Abundance")+
   theme(legend.title = element_blank(),
-        axis.title = element_text(face="bold")) -> pl
+        legend.position="none",
+        axis.title = element_text(face="bold")) -> plabund
 ggsave(filename = "figs/MDS_by_tax_abund.pdf",width = 12,height = 12,
        units = "in",
-       plot=pl)
-rm(pl)
+       plot=plabund)
 
 # weight trait data by abundance ####
 
@@ -196,7 +200,7 @@ dfTrt_ord <- dfTrt[,-c(1:37)]
 ptm <- Sys.time()###
 set.seed(pi);ordTrt <- vegan::metaMDS(dfTrt_ord,
                                    autotransform = TRUE,
-                                   trymax = 100)
+                                   trymax = 20)
 saveRDS(ordTrt, file = "data/out/ordTrt.Rdata")
 Sys.time() - ptm;rm(ptm)
 plot(ordTrt)
@@ -256,9 +260,15 @@ ggplot()+
                width = unit(0.15, "npc"),
                inherit.aes = FALSE,show.legend = FALSE,hjust=0.5)+
   coord_equal()+
+  labs(title = "NMDS: Traits")+
   theme(legend.title = element_blank(),
-        axis.title = element_text(face="bold")) -> pl
+        legend.position="none",
+        axis.title = element_text(face="bold")) -> pltrt
 ggsave(filename = "figs/MDS_by_traits.pdf",width = 12,height = 12,
        units = "in",
-       plot=pl)
-rm(pl)
+       plot=pltrt)
+
+png(file = "figs/MDS.png",
+    width=12*ppi, height=6*ppi, res=ppi)
+plabund+pltrt
+dev.off()
