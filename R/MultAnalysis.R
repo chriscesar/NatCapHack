@@ -31,17 +31,19 @@ dir(datfol)
 
 # load taxon data ####
 df_tx_l <- readxl::read_xlsx(paste0(datfol,"inf_ts_longRAW_USE.xlsx"),
-                             sheet=1)
+                             sheet="dat_all")
 
 ## widen and throw away silly variables.  Calculate mean across replicates
 df_tx_l %>% 
-  select(.,year:abundance) %>%
-  select(., -rep, -zone2.1, -zone2.2, -yr.trn.sh.meth.rep) %>% 
-  group_by(year, transect, shore, zone1,method,yr.trn,
-           yr.trn.sh,yr.trn.sh.meth, taxon) %>% 
+  select(.,year:abundance, taxonUSE) %>%
+  select(., -rep, -zone2.1, -zone2.2, -yr.trn.sh.meth.rep,-taxonReported,
+         -yr.trn,-yr.trn.sh,-yr.trn.sh.meth) %>% 
+  group_by(year, transect, shore, zone1, mesh,taxonUSE) %>% 
+  # group_by(year, transect, shore, zone1,mesh,yr.trn,
+  #          yr.trn.sh,yr.trn.sh.mesh, taxonUSE) %>% 
   summarise(abundance = mean(abundance, na.omit=TRUE),
             .groups = "drop") %>% 
-  pivot_wider(names_from = taxon, values_from = abundance,
+  pivot_wider(names_from = taxonUSE, values_from = abundance,
               values_fill = 0) %>% 
   ungroup() -> df_tx_w
 View(df_tx_w)
